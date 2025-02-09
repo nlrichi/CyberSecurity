@@ -1,4 +1,6 @@
 import javax.crypto.Cipher;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 import java.io.*;
 import java.net.*;
 import java.nio.file.Files;
@@ -94,24 +96,52 @@ public class Server {
             dos.writeInt(serverSignatureBytes.length);
             dos.write(serverSignatureBytes);
 
+            //using message digest to generate AES key and Initialisation vector for use with MD5 encryption
+            MessageDigest md = MessageDigest.getInstance("MD5");
+            byte[] aesKeyBytes = md.digest(combinedBytes);
+            SecretKeySpec aesKey = new SecretKeySpec(aesKeyBytes, "AES");
+            byte [] initVectorBytes = md.digest(aesKeyBytes);
+            IvParameterSpec iv = new IvParameterSpec(initVectorBytes);
 
-
+            //using AES encryption for file transmission
+            Cipher aesCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+            aesCipher.init(Cipher.DECRYPT_MODE, aesKey, iv);
 
             while(true) {
-                System.out.print("Enter command, options are: (ls/get filename/bye): ");
-                String command = br.readLine();
-                //client connection ends if the command is "bye"
-                if (command.equals("bye")) {
+                //gets encrypted clients command and decrypts it
+                byte[] encryptedCommand = new byte[dis.readInt()];
+                dis.readFully(encryptedCommand);
+                byte[] decryptedCommand = aesCipher.doFinal(encryptedCommand);
+                String command = new String(decryptedCommand);
+
+                if (command.startsWith("ls")) {
+                    System.out.println("List of files");
+                    File dir = new File(":");
+                    File[] files = dir.listFiles((d, name) -> !name.endsWith(".prv"));
+
+                    StringBuilder filesList = new StringBuilder();
+                    for (File file : files) {
+                        filesList.append(file.getName()).append("\n");
+                    }
+                    byte[] encryptedFileList = aesCipher.doFinal(filesList.toString().getBytes());
+                    dos.writeInt(encryptedFileList.length);
+                    dos.write(encryptedFileList);
+
+                } else if (command.startsWith("get")) {
+                    System.out.println("Getting file...");
+                    String fileName = command.split(" ")[1];
+                    File file = new File(fileName);
+                    if (!file.exists() || file.isDirectory() || fileName.endsWith(".prv")) {
+                        byte[] encryptedResponse = aesCipher.doFinal("File not found".getBytes());
+                        dos.writeInt(encryptedResponse.length);
+                        dos.write(encryptedResponse);
+                    } else {
+                        byte[] fileContent = Files.readAllBytes(file.toPath());
+                        byte[] encryptedResponse = aesCipher.doFinal(fileContent);
+                    }
+                } else if (command.equals("bye")) {
                     s.close();
                     break;
-                }
-
-                if (command.startsWith("get")) {
-                    FileOutputStream fos = new FileOutputStream(command.split(" ")[1]);
-                    fos.write(decryptedResponse);
-                    fos.close();
-                } else {
-                    System.out.println(response);
                 }
 
             }
