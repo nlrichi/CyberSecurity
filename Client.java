@@ -27,7 +27,7 @@ public class Client {
     public static void main(String [] args) throws Exception {
         //forces the required arguements to be passed.
         if (args.length != 3) {
-            System.out.println("Usage: java Client <hostname> <port> <userid>");
+            System.err.println("Usage: java Client <hostname> <port> <userid>");
         }
 
         String host = args[0]; // hostname of server
