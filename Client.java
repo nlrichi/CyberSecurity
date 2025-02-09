@@ -56,7 +56,7 @@ public class Client {
         byte[] encryptedData = cipher.doFinal((userid + new String(clientRandBytes)).getBytes());
 
 
-        //generate signature of encrypted bytes
+        //signs encrypted bytes with clients private key
         Signature signature = Signature.getInstance("SHA1withRSA");
         signature.initSign(clientPrivateKey);
         signature.update(encryptedData);
@@ -87,10 +87,10 @@ public class Client {
         cipher.init(Cipher.DECRYPT_MODE, clientPrivateKey);
         byte[] serverCombinedData = cipher.doFinal(encryptedServerBytes);
 
+        //confirms that the 16 bytes sent by the server are the same as the client's random bytes
+        byte[] receivedClientRandBytes = Arrays.copyOfRange(serverCombinedData, 0, 16);
 
-        byte[]recievedClientRandBytes = Arrays.copyOfRange(serverCombinedData, 0, 16);
-
-        if (!Arrays.equals(clientRandBytes, recievedClientRandBytes)) {
+        if (!Arrays.equals(clientRandBytes, receivedClientRandBytes)) {
             System.err.println(" Random bytes do not match the server's bytes");
             s.close();
             return;
@@ -105,7 +105,7 @@ public class Client {
 
         //using AES encryption for file transmission
         Cipher aesCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-        aesCipher.init(Cipher.DECRYPT_MODE, aesKey, iv);
+        aesCipher.init(Cipher.ENCRYPT_MODE, aesKey, iv);
 
         //Getting the user command as input from command line
         BufferedReader br = new BufferedReader(new InputStreamReader(System.in));

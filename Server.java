@@ -43,7 +43,7 @@ public class Server {
 
             PrivateKey serverPrivateKey = loadPrivateKey("server");
 
-            //reads the encrypted userid+ gen random bytes
+            //reads the encrypted userid + gen random bytes
             byte[] encryptedData = new byte[dis.readInt()];
             dis.readFully(encryptedData);
 
@@ -114,7 +114,7 @@ public class Server {
                 byte[] decryptedCommand = aesCipher.doFinal(encryptedCommand);
                 String command = new String(decryptedCommand);
 
-                if (command.startsWith("ls")) {
+                if (command.equals("ls")) {
                     System.out.println("List of files");
                     File dir = new File(":");
                     File[] files = dir.listFiles((d, name) -> !name.endsWith(".prv"));
@@ -127,7 +127,7 @@ public class Server {
                     dos.writeInt(encryptedFileList.length);
                     dos.write(encryptedFileList);
 
-                } else if (command.startsWith("get")) {
+                } else if (command.equals("get filename")) {
                     System.out.println("Getting file...");
                     String fileName = command.split(" ")[1];
                     File file = new File(fileName);
@@ -138,6 +138,9 @@ public class Server {
                     } else {
                         byte[] fileContent = Files.readAllBytes(file.toPath());
                         byte[] encryptedResponse = aesCipher.doFinal(fileContent);
+
+                        dos.writeInt(encryptedResponse.length);
+                        dos.write(encryptedResponse);
                     }
                 } else if (command.equals("bye")) {
                     s.close();
