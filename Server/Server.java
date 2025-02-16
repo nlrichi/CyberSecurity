@@ -1,3 +1,5 @@
+package Server;
+
 import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
@@ -11,7 +13,7 @@ import java.util.Arrays;
 
 public class Server {
     private static PublicKey loadPublicKey(String userid) throws Exception {
-        File pubFile = new File(userid+".pub");
+        File pubFile = new File("../" + userid + ".pub");
         byte[] pubKeyBytes = Files.readAllBytes(pubFile.toPath());
         X509EncodedKeySpec pubSpec = new X509EncodedKeySpec(pubKeyBytes);
         KeyFactory kf = KeyFactory.getInstance("RSA");
@@ -20,7 +22,7 @@ public class Server {
     }
 
     private static PrivateKey loadPrivateKey(String userid) throws Exception {
-        File privFile = new File(userid+".priv");
+        File privFile = new File("../" + userid + ".prv");
         byte[] privKeyBytes = Files.readAllBytes(privFile.toPath());
         PKCS8EncodedKeySpec privSpec = new PKCS8EncodedKeySpec(privKeyBytes);
         KeyFactory kf = KeyFactory.getInstance("RSA");
