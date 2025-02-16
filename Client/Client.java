@@ -9,74 +9,72 @@ import java.nio.file.Files;
 import java.security.*;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
-import java.util.*;
+import java.util.Arrays;
+
 public class Client {
     private static PublicKey loadPublicKey(String userid) throws Exception {
-        File pubFile = new File("../" + userid + ".pub");
+        File pubFile = new File(userid + ".pub");
         byte[] pubKeyBytes = Files.readAllBytes(pubFile.toPath());
         X509EncodedKeySpec pubSpec = new X509EncodedKeySpec(pubKeyBytes);
         KeyFactory kf = KeyFactory.getInstance("RSA");
         return kf.generatePublic(pubSpec);
-
     }
 
     private static PrivateKey loadPrivateKey(String userid) throws Exception {
-        File privFile = new File("../" + userid + ".prv");
+        File privFile = new File(userid + ".prv");
         byte[] privKeyBytes = Files.readAllBytes(privFile.toPath());
         PKCS8EncodedKeySpec privSpec = new PKCS8EncodedKeySpec(privKeyBytes);
         KeyFactory kf = KeyFactory.getInstance("RSA");
         return kf.generatePrivate(privSpec);
     }
 
-    public static void main(String [] args) throws Exception {
-        //forces the required arguements to be passed.
+    public static void main(String[] args) throws Exception {
+        // Forces the required arguments to be passed.
         if (args.length != 3) {
             System.err.println("Usage: java Client <hostname> <port> <userid>");
+            System.exit(1);
         }
 
-        String host = args[0]; // hostname of server
-        int port = Integer.parseInt(args[1]);           // port of server
-        String userid = args[2]; //userid of client
+        String host = args[0]; // Hostname of server
+        int port = Integer.parseInt(args[1]); // Port of server
+        String userid = args[2]; // Userid of client
 
-        //Connecting to the server via socket
+        // Connecting to the server via socket
         Socket s = new Socket(host, port);
         DataOutputStream dos = new DataOutputStream(s.getOutputStream());
         DataInputStream dis = new DataInputStream(s.getInputStream());
 
-
         PrivateKey clientPrivateKey = loadPrivateKey(userid);
         PublicKey serverPublicKey = loadPublicKey("server");
 
-
-        //generate 16 fresh random bytes
+        // Generate 16 fresh random bytes
         byte[] clientRandBytes = new byte[16];
         new SecureRandom().nextBytes(clientRandBytes);
 
-        //encrypt the client 16 bytes + userid using server's public key
+        // Encrypt the client 16 bytes + userid using server's public key
         Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
         cipher.init(Cipher.ENCRYPT_MODE, serverPublicKey);
         byte[] encryptedData = cipher.doFinal((userid + new String(clientRandBytes)).getBytes());
 
-
-        //signs encrypted bytes with clients private key
+        // Signs encrypted bytes with client's private key
         Signature signature = Signature.getInstance("SHA1withRSA");
         signature.initSign(clientPrivateKey);
         signature.update(encryptedData);
         byte[] signatureBytes = signature.sign();
 
-        //send the encrypted data to the server
+        // Send the encrypted data to the server
         dos.writeInt(encryptedData.length);
         dos.write(encryptedData);
         dos.writeInt(signatureBytes.length);
         dos.write(signatureBytes);
 
-        //Receives servers response + signature
+        // Receives server's response + signature
         byte[] encryptedServerBytes = new byte[dis.readInt()];
         dis.readFully(encryptedServerBytes);
         byte[] serverSignatureBytes = new byte[dis.readInt()];
         dis.readFully(serverSignatureBytes);
 
-        //verifying the server's signature using its public key
+        // Verifying the server's signature using its public key
         signature.initVerify(serverPublicKey);
         signature.update(encryptedServerBytes);
         if (!signature.verify(serverSignatureBytes)) {
@@ -85,48 +83,53 @@ public class Client {
             return;
         }
 
-        //decrypts the server combined bytes using the client's private key
+        // Decrypts the server combined bytes using the client's private key
         cipher.init(Cipher.DECRYPT_MODE, clientPrivateKey);
         byte[] serverCombinedData = cipher.doFinal(encryptedServerBytes);
 
-        //confirms that the 16 bytes sent by the server are the same as the client's random bytes
+        // Confirms that the 16 bytes sent by the server are the same as the client's random bytes
         byte[] receivedClientRandBytes = Arrays.copyOfRange(serverCombinedData, 0, 16);
-
         if (!Arrays.equals(clientRandBytes, receivedClientRandBytes)) {
-            System.err.println(" Random bytes do not match the server's bytes");
+            System.err.println("Random bytes do not match the server's bytes");
             s.close();
             return;
         }
 
-        //using message digest to generate AES key and Initialisation vector for use with MD5 encryption
+        // Using message digest to generate AES key and Initialisation vector for use with MD5 encryption
         MessageDigest md = MessageDigest.getInstance("MD5");
         byte[] aesKeyBytes = md.digest(serverCombinedData);
         SecretKeySpec aesKey = new SecretKeySpec(aesKeyBytes, "AES");
-        byte [] initVectorBytes = md.digest(aesKeyBytes);
+        byte[] initVectorBytes = md.digest(aesKeyBytes);
         IvParameterSpec iv = new IvParameterSpec(initVectorBytes);
 
-        //using AES encryption for file transmission
+        // Using AES encryption for file transmission
         Cipher aesCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
         aesCipher.init(Cipher.ENCRYPT_MODE, aesKey, iv);
 
-        //Getting the user command as input from command line
+        // Getting the user command as input from command line
         BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
-        //repeatedly prompting the user to type in what they want to do
-        while(true) {
+        // Repeatedly prompting the user to type in what they want to do
+        while (true) {
             System.out.print("Enter command, options are: (ls/get filename/bye): ");
             String command = br.readLine();
+
+            // Check if the command is valid
+            if (!command.startsWith("ls") && !command.startsWith("get") && !command.equals("bye")) {
+                System.out.println("Unrecognized command. Please try again.");
+                continue;
+            }
 
             byte[] encryptedCommand = aesCipher.doFinal(command.getBytes());
             dos.writeInt(encryptedCommand.length);
             dos.write(encryptedCommand);
 
-            //client connection ends if the command is "bye"
+            // Client connection ends if the command is "bye"
             if (command.equals("bye")) {
                 s.close();
                 break;
             }
 
-            byte [] encryptedResponse = new byte[dis.readInt()];
+            byte[] encryptedResponse = new byte[dis.readInt()];
             dis.readFully(encryptedResponse);
             byte[] decryptedResponse = aesCipher.doFinal(encryptedResponse);
             String response = new String(decryptedResponse);
@@ -137,9 +140,6 @@ public class Client {
             } else {
                 System.out.println(response);
             }
-
         }
-
-
     }
 }
