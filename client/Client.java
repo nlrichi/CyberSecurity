@@ -1,4 +1,4 @@
-package Client;
+package client;
 
 import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
@@ -31,7 +31,7 @@ public class Client {
     public static void main(String[] args) throws Exception {
         // Forces the required arguments to be passed.
         if (args.length != 3) {
-            System.err.println("Usage: java Client <hostname> <port> <userid>");
+            System.err.println("Usage: java client <hostname> <port> <userid>");
             System.exit(1);
         }
 
@@ -78,7 +78,7 @@ public class Client {
         signature.initVerify(serverPublicKey);
         signature.update(encryptedServerBytes);
         if (!signature.verify(serverSignatureBytes)) {
-            System.err.println("Server signature could not be verified");
+            System.err.println("server signature could not be verified");
             s.close();
             return;
         }
@@ -123,7 +123,7 @@ public class Client {
             dos.writeInt(encryptedCommand.length);
             dos.write(encryptedCommand);
 
-            // Client connection ends if the command is "bye"
+            // client connection ends if the command is "bye"
             if (command.equals("bye")) {
                 s.close();
                 break;

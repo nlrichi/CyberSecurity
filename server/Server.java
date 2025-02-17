@@ -1,4 +1,4 @@
-package Server;
+package server;
 
 import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
@@ -31,7 +31,7 @@ public class Server {
 
     public static void main(String[] args) throws Exception {
         if (args.length != 1) {
-            System.err.println("Usage: java Server <port>");
+            System.err.println("Usage: java server <port>");
             System.exit(1);
         }
         int port = Integer.parseInt(args[0]);
@@ -63,7 +63,7 @@ public class Server {
             byte[] clientRandomBytes = Arrays.copyOfRange(decryptedData, decryptedData.length - 16, decryptedData.length);
 
             // Log client userid and 32 plaintext bytes
-            System.out.println("Client userid: " + userid);
+            System.out.println("client userid: " + userid);
             System.out.println("32 plaintext bytes: " + Base64.getEncoder().encodeToString(decryptedData));
 
             PublicKey clientPublicKey = loadPublicKey(userid);
