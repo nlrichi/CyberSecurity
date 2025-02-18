@@ -133,7 +133,7 @@ public class Client {
                         System.out.println("Error: " + response);
                     } else {
                         try {
-                            FileOutputStream fos = new FileOutputStream(fileName);
+                            FileOutputStream fos = new FileOutputStream("client/" + fileName);
                             fos.write(decryptedResponse);
                             fos.close();
                         } catch (IOException e) {
