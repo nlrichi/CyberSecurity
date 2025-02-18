@@ -49,37 +49,30 @@ public class Server {
         while (true) {
             try {
                 Socket s = ss.accept();
-                System.out.println("Client connected from: " + s.getInetAddress());
                 DataInputStream dis = new DataInputStream(s.getInputStream());
                 DataOutputStream dos = new DataOutputStream(s.getOutputStream());
 
                 PrivateKey serverPrivateKey = loadPrivateKey("server");
 
-                // Reads the encrypted userid + gen random bytes
                 byte[] encryptedData = new byte[dis.readInt()];
                 dis.readFully(encryptedData);
 
-                // Reads the signature
                 byte[] signature = new byte[dis.readInt()];
                 dis.readFully(signature);
 
-                // Decrypt the encrypted data using server's private key
                 Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
                 cipher.init(Cipher.DECRYPT_MODE, serverPrivateKey);
                 byte[] decryptedData = cipher.doFinal(encryptedData);
 
-                // Obtains the client's userid and the 16 bytes
                 int useridLength = decryptedData.length - 16;
                 String userid = new String(decryptedData, 0, useridLength, StandardCharsets.UTF_8);
                 byte[] clientRandomBytes = Arrays.copyOfRange(decryptedData, useridLength, decryptedData.length);
 
-                // Log client userid and 32 plaintext bytes
                 System.out.println("client userid: " + userid);
                 System.out.println("32 plaintext bytes: " + Base64.getEncoder().encodeToString(decryptedData));
 
                 PublicKey clientPublicKey = loadPublicKey(userid);
 
-                // Verifying the signature using the client's public key
                 Signature sig = Signature.getInstance("SHA1withRSA");
                 sig.initVerify(clientPublicKey);
                 sig.update(encryptedData);
@@ -89,42 +82,35 @@ public class Server {
                     continue;
                 }
 
-                // Generate random bytes
                 byte[] serverRandBytes = new byte[16];
                 new SecureRandom().nextBytes(serverRandBytes);
                 byte[] combinedBytes = new byte[32];
                 System.arraycopy(clientRandomBytes, 0, combinedBytes, 0, 16);
                 System.arraycopy(serverRandBytes, 0, combinedBytes, 16, 16);
 
-                // Encrypting the combined bytes using RSA
                 cipher.init(Cipher.ENCRYPT_MODE, clientPublicKey);
                 byte[] encryptedCombinedBytes = cipher.doFinal(combinedBytes);
 
-                // Generates a signature of encrypted bytes
                 sig.initSign(serverPrivateKey);
                 sig.update(encryptedCombinedBytes);
                 byte[] serverSignatureBytes = sig.sign();
 
-                // Sending the client the combined bytes and a signature using its private key
                 dos.writeInt(encryptedCombinedBytes.length);
                 dos.write(encryptedCombinedBytes);
                 dos.writeInt(serverSignatureBytes.length);
                 dos.write(serverSignatureBytes);
 
-                // Using message digest to generate AES key and Initialisation vector
                 MessageDigest md = MessageDigest.getInstance("MD5");
                 byte[] aesKeyBytes = md.digest(combinedBytes);
                 SecretKeySpec aesKey = new SecretKeySpec(aesKeyBytes, "AES");
                 byte[] initVectorBytes = md.digest(aesKeyBytes);
                 IvParameterSpec iv = new IvParameterSpec(initVectorBytes);
 
-                // Using AES encryption for file transmission
                 Cipher aesCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
                 aesCipher.init(Cipher.ENCRYPT_MODE, aesKey, iv);
 
                 while (true) {
                     try {
-                        // Gets encrypted client's command and decrypts it
                         byte[] encryptedCommand = new byte[dis.readInt()];
                         dis.readFully(encryptedCommand);
                         aesCipher.init(Cipher.DECRYPT_MODE, aesKey, iv);
@@ -159,7 +145,6 @@ public class Server {
                             String fileName = command.split(" ")[1];
                             File file = new File("server/" + fileName);
 
-                            // Verify file exists and is not a private key file
                             if (!file.exists() || file.isDirectory() || fileName.endsWith(".prv")) {
                                 System.out.println("File not found or access denied: " + fileName);
                                 aesCipher.init(Cipher.ENCRYPT_MODE, aesKey, iv);
@@ -174,7 +159,7 @@ public class Server {
                                 dos.writeInt(encryptedResponse.length);
                                 dos.write(encryptedResponse);
                             }
-                    } else if (command.equals("bye")) {
+                        } else if (command.equals("bye")) {
                             s.close();
                             break;
                         }
